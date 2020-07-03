@@ -1,5 +1,6 @@
 package com.coolweather.android;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
@@ -22,6 +23,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.bumptech.glide.Glide;
 import com.coolweather.android.gson.Forecast;
 import com.coolweather.android.gson.Weather;
+import com.coolweather.android.service.AutoUpdateService;
 import com.coolweather.android.util.HttpUtil;
 import com.coolweather.android.util.Utility;
 
@@ -85,45 +87,35 @@ public class WeatherActivity extends AppCompatActivity {
             }
         });
 
-    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-    String weatherString = prefs.getString("weather", null);
-        if(weatherString !=null)
-
-    {
-        //	有缓存时直接解析天气数据
-        Weather weather = Utility.handleWeatherResponse(weatherString);
-        mWeatherId = weather.basic.weatherId;
-        showWeatherInfo(weather);
-    } else
-
-    {
-        //	无缓存时去服务器查询天气
-        mWeatherId = getIntent().getStringExtra("weather_id");
-        weatherLayout.setVisibility(View.INVISIBLE);
-        requestWeather(mWeatherId);
-    }
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String weatherString = prefs.getString("weather", null);
+        if (weatherString != null) {
+            //	有缓存时直接解析天气数据
+            Weather weather = Utility.handleWeatherResponse(weatherString);
+            mWeatherId = weather.basic.weatherId;
+            showWeatherInfo(weather);
+        } else {
+            //	无缓存时去服务器查询天气
+            mWeatherId = getIntent().getStringExtra("weather_id");
+            weatherLayout.setVisibility(View.INVISIBLE);
+            requestWeather(mWeatherId);
+        }
         swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.
-                OnRefreshListener()
+                OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                requestWeather(mWeatherId);
+            }
+        });
 
-    {
-        @Override
-        public void onRefresh () {
-        requestWeather(mWeatherId);
+        String bingPic = prefs.getString("bing_pic", null);
+        if (bingPic != null) {
+            Glide.with(this).load(bingPic).into(bingPicImg);
+        } else {
+            loadBingPic();
+        }
+
     }
-    });
-
-    String bingPic = prefs.getString("bing_pic", null);
-        if(bingPic !=null)
-
-    {
-        Glide.with(this).load(bingPic).into(bingPicImg);
-    } else
-
-    {
-        loadBingPic();
-    }
-
-}
 
     /**
      * 根据天气id请求城市天气信息
@@ -206,6 +198,9 @@ public class WeatherActivity extends AppCompatActivity {
         titleUpdateTime.setText(updateTime);
         degreeText.setText(degree);
         weatherInfoText.setText(weatherInfo);
+        weatherLayout.setVisibility(View.VISIBLE);
+        Intent intent = new Intent(this, AutoUpdateService.class);
+        startService(intent);
         forecastLayout.removeAllViews();
         for (Forecast forecast : weather.forecastList) {
             View view = LayoutInflater.from(this).inflate(R.layout.forecast_item, forecastLayout, false);
